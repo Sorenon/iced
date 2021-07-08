@@ -144,6 +144,21 @@ pub trait Sandbox {
     {
         <Self as Application>::run(settings)
     }
+
+    /// Runs the [`Sandbox`].
+    ///
+    /// On native platforms, this method will take control of the current thread
+    /// and __will NOT return__.
+    ///
+    /// Unlike Sandbox::new (when using winit) this does not have to be called on
+    /// the main thread for it to work. The drawback being that it does not work
+    /// on all platforms.
+    fn run_any_thread(settings: Settings<()>) -> Result<(), Error>
+    where
+        Self: 'static + Sized,
+    {
+        <Self as Application>::run_any_thread(settings)
+    }
 }
 
 impl<T> Application for T

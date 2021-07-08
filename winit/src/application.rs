@@ -111,6 +111,21 @@ where
     E: Executor + 'static,
     C: window::Compositor<Renderer = A::Renderer> + 'static,
 {
+    run_ext::<A, E, C>(settings, compositor_settings, false)
+}
+
+/// Runs an [`Application`] with an executor, compositor, and the provided
+/// settings.
+pub fn run_ext<A, E, C>(
+    settings: Settings<A::Flags>,
+    compositor_settings: C::Settings,
+    any_thread: bool
+) -> Result<(), Error>
+where
+    A: Application + 'static,
+    E: Executor + 'static,
+    C: window::Compositor<Renderer = A::Renderer> + 'static,
+{
     use futures::task;
     use futures::Future;
     use winit::event_loop::EventLoop;
@@ -118,8 +133,38 @@ where
     let mut debug = Debug::new();
     debug.startup_started();
 
-    let event_loop = EventLoop::with_user_event();
+    let event_loop = if any_thread {
+        #[cfg(windows)]
+        { 
+            use winit::platform::windows::EventLoopExtWindows as EventLoopExt;
+            EventLoop::new_any_thread()
+        }
+        
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use winit::platform::linux::EventLoopExtUnix; 
+            EventLoop::new_any_thread()
+        }
 
+        #[cfg(not(any(
+            windows,
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
+        panic!("The platform you're compiling for cannot create an event loop on any thread");
+    } else {
+        EventLoop::with_user_event()
+    };
+    
     let mut runtime = {
         let proxy = Proxy::new(event_loop.create_proxy());
         let executor = E::new().map_err(Error::ExecutorCreationFailed)?;
